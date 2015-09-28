@@ -39,12 +39,13 @@ class CatchLetters(cocos.layer.ColorLayer):
         self.true_answ = 0
         self.parallel_letters = 1
         self.mod = 5
+        self.score = 0
 
         # 0 = finished; 1 = running
         self.game_state = 1
         self.keys_after_finished = 0
         self.schedule(self.create_letters)
-        self.score = None
+        self.score_label = None
         self.lives = None
         self.update_score()
 
@@ -57,7 +58,7 @@ class CatchLetters(cocos.layer.ColorLayer):
         self.add(letter_layer)
 
     def create_letters(self, dt):
-        if len(self.letters) < self.parallel_letters:
+        if len(self.letters) < self.parallel_letters and self.game_state >= 1:
             self.create_letter()
 
     def correct(self, key):
@@ -80,6 +81,7 @@ class CatchLetters(cocos.layer.ColorLayer):
             letter = self.correct(key)
             if letter:
                 self.true_answ += 1
+                self.score += 100
                 self.cat_layer.next_cat()
                 self.remove_letter(letter)
                 self.speed += 20
@@ -97,12 +99,12 @@ class CatchLetters(cocos.layer.ColorLayer):
         self.check_finish()
 
     def update_score(self):
-        if self.score:
-            self.remove(self.score)
+        if self.score_label:
+            self.remove(self.score_label)
             self.remove(self.lives)
-        self.score = cocos.text.Label('Score: {}'.format(self.true_answ * 100), font_size=20, x=10, y=height() - 20, color=(255, 0, 0, 255))
+        self.score_label = cocos.text.Label('Score: {}'.format(self.score), font_size=20, x=10, y=height() - 20, color=(255, 0, 0, 255))
         self.lives = cocos.text.Label('Lives: {}'.format(LIVES - self.wrong_answ), font_size=20, x=width() - 100, y=height() - 20, color=(255, 0, 0, 255))
-        self.add(self.score)
+        self.add(self.score_label)
         self.add(self.lives)
 
     def check_finish(self):
@@ -138,6 +140,9 @@ class LetterDisplay(cocos.layer.Layer):
         else:
             self.text.do(MoveBy((0, 10), duration=self.speed))
 
+LEFT = 'cat_dance_04'
+RIGHT = 'cat_dance_02'
+
 
 class CatDisplay(cocos.layer.Layer):
 
@@ -150,17 +155,16 @@ class CatDisplay(cocos.layer.Layer):
         self.cat = None
         self.next_cat()
         self.finished = False
+        self.schedule(self.update)
+        self.until_pos = width() - 100
+        self.cur_pos = width() / 2
+        self.direction = 1
+        self.from_pos = 100
 
     def next_cat(self):
         self.catidx += 1
         if self.catidx == len(self.cat_paths):
             self.catidx = 0
-        if self.cat:
-            self.remove(self.cat)
-        self.cat = cocos.sprite.Sprite(self.cat_paths[self.catidx] + '.png')
-        self.cat.position = width() / 2, height() / 2
-        self.cat.scale = 1
-        self.add(self.cat)
 
     def show_dead_cat(self):
         self.finished = True
@@ -176,6 +180,21 @@ class CatDisplay(cocos.layer.Layer):
         self.cat = cocos.sprite.Sprite('happy_cat.png')
         self.cat.position = width() / 2, height() / 2
         self.cat.scale = 0.3
+        self.add(self.cat)
+
+    def update(self, dp):
+        if self.finished:
+            return
+        if self.cat:
+            self.remove(self.cat)
+        sprite = self.cat_paths[self.catidx]
+        self.cat = cocos.sprite.Sprite(sprite + '.png')
+        if sprite == LEFT and self.cur_pos >= self.from_pos:
+            self.cur_pos -= 5
+        elif sprite == RIGHT and self.cur_pos <= self.until_pos:
+            self.cur_pos += 5
+        self.cat.position = self.cur_pos, height() / 2
+        self.cat.scale = 1
         self.add(self.cat)
 
     def on_key_release(self, key, modifiers):
