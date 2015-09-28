@@ -25,9 +25,8 @@ def height():
 class CatchLetters(cocos.layer.ColorLayer):
     is_event_handler = True
 
-    def __init__(self, cat_layer, letter_layer, exit_callback):
+    def __init__(self, cat_layer, letter_layer):
         super(CatchLetters, self).__init__(255, 255, 255, 255)
-        self.exit = exit_callback
         self.cat_layer = cat_layer
         self.letter_layer = letter_layer
         self.wrong_answ = 0
@@ -54,15 +53,6 @@ class CatchLetters(cocos.layer.ColorLayer):
                 self.letter_layer.remove(self.letter_layer.text)
                 self.game_state = 0
 
-    def on_key_release(self, key, modifiers):
-        if self.game_state < 1:
-            self.keys_after_finished += 1
-            if self.keys_after_finished >= 2:
-                if self.game_state == 0:
-                    self.exit(True)
-                else:
-                    self.exit(False)
-
     def move_letter(self, dt):
         if self.game_state >= 1:
             if self.letter_layer.text.position[1] >= height():
@@ -88,12 +78,15 @@ class LetterDisplay(cocos.layer.Layer):
 
 class CatDisplay(cocos.layer.Layer):
 
+    is_event_handler = True
+
     def __init__(self):
         super(CatDisplay, self).__init__()
         self.cat_paths = ['cat_dance_01', 'cat_dance_02', 'cat_dance_03', 'cat_dance_04']
         self.catidx = -1
         self.cat = None
         self.next_cat()
+        self.finished = False
 
     def next_cat(self):
         self.catidx += 1
@@ -107,6 +100,7 @@ class CatDisplay(cocos.layer.Layer):
         self.add(self.cat)
 
     def show_dead_cat(self):
+        self.finished = True
         self.remove(self.cat)
         self.cat = cocos.sprite.Sprite('cat_dead.png')
         self.cat.position = width() / 2, height() / 2
@@ -114,11 +108,17 @@ class CatDisplay(cocos.layer.Layer):
         self.add(self.cat)
 
     def show_happy_cat(self):
+        self.finished = True
         self.remove(self.cat)
         self.cat = cocos.sprite.Sprite('happy_cat.png')
         self.cat.position = width() / 2, height() / 2
         self.cat.scale = 0.3
         self.add(self.cat)
+
+    def on_key_release(self, key, modifiers):
+        if self.finished is True and (key == pyglet.window.key.ENTER or
+                                key == pyglet.window.key.SPACE):
+            run()
 
 
 class CatchLettersGame():
@@ -132,18 +132,10 @@ class CatchLettersGame():
         return cocos.scene.Scene(self.scene, self.letter, self.cat)
 
 
-def exit(won=False):
-    if won is False:
-        run()
-    else:
-        sys.exit()
-
-
 def run():
     cat = CatDisplay()
     letter = LetterDisplay()
-    exit_callback = exit
-    main_scene = CatchLetters(cat, letter, exit_callback)
+    main_scene = CatchLetters(cat, letter)
     cocos.director.director.run(cocos.scene.Scene(main_scene, letter, cat))
 
 
