@@ -13,6 +13,9 @@ import pyglet.resource
 pyglet.resource.path = [images]
 pyglet.resource.reindex()
 
+SPEED = 1000
+LIVES = 5
+
 
 def width():
     return cocos.director.director.window.width
@@ -25,55 +28,115 @@ def height():
 class CatchLetters(cocos.layer.ColorLayer):
     is_event_handler = True
 
-    def __init__(self, cat_layer, letter_layer):
+    def __init__(self):
         super(CatchLetters, self).__init__(255, 255, 255, 255)
-        self.cat_layer = cat_layer
-        self.letter_layer = letter_layer
+        self.speed = SPEED
+        self.cat_layer = CatDisplay()
+        self.add(self.cat_layer)
+
+        self.letters = []
         self.wrong_answ = 0
         self.true_answ = 0
-        self.schedule(self.move_letter)
+        self.parallel_letters = 1
+        self.mod = 5
 
         # 0 = finished; 1 = running
         self.game_state = 1
         self.keys_after_finished = 0
+        self.schedule(self.create_letters)
+        self.score = None
+        self.lives = None
+        self.update_score()
+
+    def move_speed(self):
+        return width() / (self.speed * 10.0)
+
+    def create_letter(self):
+        letter_layer = LetterDisplay(self.move_speed(), self)
+        self.letters.append(letter_layer)
+        self.add(letter_layer)
+
+    def create_letters(self, dt):
+        if len(self.letters) < self.parallel_letters:
+            self.create_letter()
+
+    def correct(self, key):
+        for letter in self.letters:
+            if letter.random_letter == key:
+                return letter
+        return None
+
+    def remove_letter(self, letter):
+        self.remove(letter)
+        self.letters.remove(letter)
+
+    def cleanup(self):
+        self.parallel_letters = 0
+        for letter in self.letters:
+            self.remove_letter(letter)
 
     def on_text(self, key):
         if self.game_state >= 1:
-            if self.letter_layer.random_letter == key:
-                self.letter_layer.update()
-                self.cat_layer.next_cat()
+            letter = self.correct(key)
+            if letter:
                 self.true_answ += 1
+                self.cat_layer.next_cat()
+                self.remove_letter(letter)
+                self.speed += 20
+                if self.true_answ % self.mod == 0:
+                    self.mod += 20
+                    self.parallel_letters += 1
             else:
                 self.wrong_answ += 1
-                if self.wrong_answ >= 3:
-                    self.cat_layer.show_dead_cat()
-                    self.game_state = -1
-            if self.true_answ >= 6:
-                self.cat_layer.show_happy_cat()
-                self.letter_layer.remove(self.letter_layer.text)
-                self.game_state = 0
+                self.check_finish()
+        self.update_score()
 
-    def move_letter(self, dt):
-        if self.game_state >= 1:
-            if self.letter_layer.text.position[1] >= height():
-                self.cat_layer.show_dead_cat()
+    def failed(self, letter):
+        self.remove_letter(letter)
+        self.wrong_answ += 1
+        self.check_finish()
+
+    def update_score(self):
+        if self.score:
+            self.remove(self.score)
+            self.remove(self.lives)
+        self.score = cocos.text.Label('Score: {}'.format(self.true_answ * 100), font_size=20, x=10, y=height() - 20, color=(255, 0, 0, 255))
+        self.lives = cocos.text.Label('Lives: {}'.format(LIVES - self.wrong_answ), font_size=20, x=width() - 100, y=height() - 20, color=(255, 0, 0, 255))
+        self.add(self.score)
+        self.add(self.lives)
+
+    def check_finish(self):
+        self.update_score()
+        if self.wrong_answ >= LIVES:
+            self.cleanup()
+            if self.true_answ > 50:
+                self.cat_layer.show_happy_cat()
             else:
-                self.letter_layer.text.do(MoveBy((0, 50), duration=0.4))
+                self.cat_layer.show_dead_cat()
+            self.game_state = -1
 
 
 class LetterDisplay(cocos.layer.Layer):
+    is_event_handler = True
 
-    def __init__(self):
+    def __init__(self, speed, callback):
         super(LetterDisplay, self).__init__()
-        self.move_step = 10
-        self.move_speed = 0.1
-        self.text = cocos.text.Label('', font_size=40, x=100, y=0, color=(0, 0, 0, 255))
+        self.callback = callback
+        self.speed = speed
+        self.text = cocos.text.Label('', font_size=40, x=random.randint(0, width() - 20), y=0, color=(0, 0, 0, 255))
         self.update()
         self.add(self.text)
+        self.schedule(self.move_letter)
 
     def update(self):
         self.random_letter = random.choice(string.ascii_letters.lower())
-        self.text.element.text = self.random_letter
+        self.text.element.text = self.random_letter.upper()
+
+    def move_letter(self, dt):
+        if self.text.position[1] >= height():
+            self.callback.failed(self)
+        else:
+            self.text.do(MoveBy((0, 10), duration=self.speed))
 
 
 class CatDisplay(cocos.layer.Layer):
@@ -121,26 +184,13 @@ class CatDisplay(cocos.layer.Layer):
             run()
 
 
-class CatchLettersGame():
-
-    def __init__(self, exit_callback):
-        self.cat = CatDisplay()
-        self.letter = LetterDisplay()
-        self.scene = CatchLetters(self.cat, self.letter, exit_callback)
-
-    def main_scene(self):
-        return cocos.scene.Scene(self.scene, self.letter, self.cat)
-
-
 def run():
-    cat = CatDisplay()
-    letter = LetterDisplay()
-    main_scene = CatchLetters(cat, letter)
-    cocos.director.director.run(cocos.scene.Scene(main_scene, letter, cat))
+    main_scene = CatchLetters()
+    cocos.director.director.run(cocos.scene.Scene(main_scene))
 
 
 def main():
-    cocos.director.director.init(width=800, height=640)
+    cocos.director.director.init(width=800, height=640, resizable=False)
     run()
 
 if __name__ == '__main__':
