@@ -123,7 +123,7 @@ class LetterDisplay(cocos.layer.Layer):
         super(LetterDisplay, self).__init__()
         self.callback = callback
         self.speed = speed
-        self.text = cocos.text.Label('', font_size=40, x=random.randint(0, width() - 20), y=0, color=(0, 0, 0, 255))
+        self.text = cocos.text.Label('', font_size=40, x=random.randint(0, width() - 40), y=0, color=(0, 0, 0, 255))
         self.update()
         self.add(self.text)
         self.schedule(self.move_letter)
